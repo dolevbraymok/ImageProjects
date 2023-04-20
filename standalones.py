@@ -13,8 +13,6 @@ LAPLACIAN_KERNEL = np.array(([0,1,0],[1,-4,1],[0,1,0]),dtype='int')
 SOBELX_KERNEL = np.array(([-1,0,1],[-2,0,2],[-1,0,1]),dtype='int')
 SOBELY_KERNEL = numpy.transpose(SOBELX_KERNEL)
 
-
-
 def convolve(image, kernel, padMethod=REPLICATE_PADDING):
     """
     A simple convolution method with few padding options
@@ -86,10 +84,7 @@ def build_gaussian_filter(filter_size):
         new_filter = np.convolve(new_filter, CONV_GAUSS_CREATOR)
     return (new_filter / np.sum(new_filter)).reshape(1, filter_size)
 
-if __name__ == '__main__':
-    image = cv2.imread("Images/kiki1.png")
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    # cv2.imshow("gray",gray)
-    cv2.imshow("convolve", convolve(gray,SHAPEN_KERNEL))
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+
+
+
+
