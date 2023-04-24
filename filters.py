@@ -1,5 +1,4 @@
 import cv2
-import numpy
 import numpy as np
 from skimage.exposure import rescale_intensity
 
@@ -10,9 +9,9 @@ WARP_PADDING = 4
 
 SHAPEN_KERNEL = np.array(([0,-1,0],[-1,5,-1],[0,-1,0]),dtype='int')
 LAPLACIAN_KERNEL = np.array(([0,1,0],[1,-4,1],[0,1,0]),dtype='int')
-SOBELX_KERNEL = np.array(([-1,0,1],[-2,0,2],[-1,0,1]),dtype='int')
-SOBELY_KERNEL = numpy.transpose(SOBELX_KERNEL)
 
+
+CONV_GAUSS_CREATOR =[1,1]
 def convolve(image, kernel, padMethod=REPLICATE_PADDING):
     """
     A simple convolution method with few padding options
@@ -87,4 +86,34 @@ def build_gaussian_filter(filter_size):
 
 
 
+def shapenFilter(image):
+    """
+    sharpen an RGB image
+    :param image: RGB image
+    :return:sharpend RGB image
+    """
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    light, a, b = cv2.split(lab)
 
+    #sharp by convolution
+    light = convolve(light, SHAPEN_KERNEL)
+
+    #increase contrast by adaptive histogram equilization
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    light_eq = clahe.apply(light)
+    lab_eq = cv2.merge((light_eq, a, b))
+
+
+    #apply sharpening filter and return
+    return cv2.cvtColor(lab_eq, cv2.COLOR_LAB2BGR)
+
+
+
+
+if __name__ == '__main__':
+    image = cv2.imread("Images/friends_faces.jpg")
+    sharp = shapenFilter(image)
+    cv2.imshow("name1",image)
+    cv2.imshow("name2", sharp)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()

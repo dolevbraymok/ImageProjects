@@ -261,7 +261,7 @@ def creating_t_arr_for_quant(z_arr, q_arr, n_quant):
 
 def quantize(im_orig, n_quant, n_iter):
     """
-    Performs optimal quantization of a given greyscale or RGB image
+    Performs optimal quantization of a given greyscale image
     :param im_orig: Input float64 [0,1] image
     :param n_quant: Number of intensities im_quant image will have
     :param n_iter: Maximum number of iterations of the optimization
@@ -271,18 +271,8 @@ def quantize(im_orig, n_quant, n_iter):
                 quantization procedure
     """
     tmp_im = im_orig
-    if len(im_orig.shape) == 3:
-        is_rgb = True
-        tmp_im = rgb2yiq(im_orig)
-        histo = np.histogram(tmp_im[:, :, 0], BIN_SIZE)[0]
-    else:
-        is_rgb = False
-        histo = np.histogram(tmp_im, BIN_SIZE)[0]
+    histo = np.histogram(tmp_im, BIN_SIZE)[0]
     errors, q_arr, z_arr = quant_iterations(histo, n_iter, n_quant)
     t_arr = creating_t_arr_for_quant(z_arr, q_arr, n_quant)
-    if is_rgb:
-        im_quant = img_equalize_rgb(t_arr, tmp_im)
-        im_quant = rgb2yiq(im_quant)
-    else:
-        im_quant = img_equlize_gray(t_arr, tmp_im)
+    im_quant = img_equlize_gray(t_arr, tmp_im)
     return [im_quant, errors]
