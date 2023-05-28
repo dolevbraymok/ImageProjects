@@ -1,0 +1,5 @@
+this code recieve a video and creates a panorama.
+
+The program find and create descriptor by using harris corner detector
+afterwards the program runs RANSAC to find a homography with maximum matches of descriptors
+afterwards it warp the image and stiches them

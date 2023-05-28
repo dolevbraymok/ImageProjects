@@ -1,0 +1,2 @@
+the program is a simple example of usage of histograms to Equalize images and quantize them (grayscale only)
+alot of the functionn created in this code exists in other libraries like opencv but written here for study purpose. 
