@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import ndimage.filters.convolve
 from skimage.exposure import rescale_intensity
 
 ZERO_PADDING = 1
