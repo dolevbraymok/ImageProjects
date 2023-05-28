@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from scipy import ndimage
 from skimage.exposure import rescale_intensity
 
 ZERO_PADDING = 1
