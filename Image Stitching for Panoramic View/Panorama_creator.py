@@ -14,9 +14,6 @@ from scipy.ndimage import convolve
 import shutil
 from imageio import imwrite
 
-
-
-
 DERIV_FILTER = np.array([[1, 0, -1]]).astype(np.float64)
 K_HARRIS_CONST = 0.04
 
@@ -28,6 +25,7 @@ RGB = 2
 BIN_SIZE = 256
 CONV_GAUSS_CREATOR = [1, 1]
 MINIMUM_RESOLUTION = 16
+
 
 def gaussian_kernel(kernel_size):
     conv_kernel = np.array([1, 1], dtype=np.float64)[:, None]
@@ -49,7 +47,6 @@ def blur_spatial(img, kernel_size):
     return blur_img
 
 
-
 def read_image(filename, representation):
     """
     Reads an image and converts it into a given representation
@@ -67,6 +64,8 @@ def read_image(filename, representation):
         return rgb2gray(img)
     else:
         return img / (BIN_SIZE - 1)
+
+
 def reduce(im, blur_filter):
     """
     Reduces an image by a factor of 2 using the blur filter
@@ -116,6 +115,8 @@ def build_gaussian_pyramid(im, max_levels, filter_size):
         if tmp_image.shape[0] <= MINIMUM_RESOLUTION or tmp_image.shape[1] <= MINIMUM_RESOLUTION:
             break
     return pyr, blur_filter
+
+
 def harris_corner_detector(im):
     """
   Detects harris corners.
@@ -124,13 +125,13 @@ def harris_corner_detector(im):
   :return: An array with shape (N,2), where ret[i,:] are the [x,y] coordinates of the ith corner points.
   """
     conv = DERIV_FILTER.astype(im.dtype).reshape(3, 1)
-    I_x = convolve(im, conv)
-    I_y = convolve(im, conv.T)
-    I_x_pow = blur_spatial(np.power(I_x, 2), 3)
-    I_y_pow = blur_spatial(np.power(I_y, 2), 3)
-    I_x_y = blur_spatial(I_x * I_y, 3)
+    i_x = convolve(im, conv)
+    i_y = convolve(im, conv.T)
+    i_x_pow = blur_spatial(np.power(i_x, 2), 3)
+    i_y_pow = blur_spatial(np.power(i_y, 2), 3)
+    i_x_y = blur_spatial(i_x * i_y, 3)
 
-    tmp_matrix = np.dstack((I_x_pow, I_x_y, I_x_y, I_y_pow)).reshape((-1, 2, 2))
+    tmp_matrix = np.dstack((i_x_pow, i_x_y, i_x_y, i_y_pow)).reshape((-1, 2, 2))
     det = np.linalg.det(tmp_matrix)
     tra = K_HARRIS_CONST * (np.trace(tmp_matrix.T) ** 2)
     coord_t = np.where(non_maximum_suppression((det - tra).reshape(im.shape)) == True)
@@ -140,7 +141,7 @@ def harris_corner_detector(im):
 def get_patch(im, p, desc_rad):
     """
     The function return a patch around p  with desc_rad radius
-    :param g_pyr: gaussian pyramid for values
+    :param im: the image we want the patch from
     :param p: the index we patch around
     :param desc_rad: the radius of the patch
     :return: np.array with shape (1+2*desc_rad, 1+2*desc_rad)
@@ -151,7 +152,7 @@ def get_patch(im, p, desc_rad):
     big_y = p[0] + desc_rad + 1
     coords = np.mgrid[small_x:big_x, small_y: big_y]
     return scipy.ndimage.map_coordinates(im, coords, order=1,
-                                                  prefilter=False).reshape(1 + 2 * desc_rad, 1 + 2 * desc_rad)
+                                         prefilter=False).reshape(1 + 2 * desc_rad, 1 + 2 * desc_rad)
 
 
 def sample_descriptor(im, pos, desc_rad):
@@ -185,7 +186,6 @@ def create_desc_container(p, desc_container, desc_rad, im):
         desc_container.append(np.zeros((1 + 2 * desc_rad, 1 + 2 * desc_rad)))
     else:
         desc_container.append((p_patch - p_mean) / p_norm)
-
 
 
 def find_features(pyr):
@@ -242,15 +242,15 @@ def create_scores(desc1, desc2, k, min_score):
     return column_matrix & row_matrix & min_score_matrix
 
 
-def apply_homography(pos1, H12):
+def apply_homography(pos1, h12):
     """
   Apply homography to inhomogenous points.
   :param pos1: An array with shape (N,2) of [x,y] point coordinates.
-  :param H12: A 3x3 homography matrix.
+  :param h12: A 3x3 homography matrix.
   :return: An array with the same shape as pos1 with [x,y] point coordinates obtained from transforming pos1 using H12.
   """
     pos1_3d = np.hstack((pos1, np.ones((pos1.shape[0], 1))))
-    post_mult = np.dot(H12, pos1_3d.T).T
+    post_mult = np.dot(h12, pos1_3d.T).T
     return post_mult[:, : -1] / np.array([post_mult[:, 2]]).T
 
 
@@ -294,7 +294,7 @@ def display_matches(im1, im2, points1, points2, inliers):
   Dispalay matching points.
   :param im1: A grayscale image.
   :param im2: A grayscale image.
-  :parma points1: An aray shape (N,2), containing N rows of [x,y] coordinates of matched points in im1.
+  :param points1: points1: An aray shape (N,2), containing N rows of [x,y] coordinates of matched points in im1.
   :param points2: An aray shape (N,2), containing N rows of [x,y] coordinates of matched points in im2.
   :param inliers: An array with shape (S,) of inlier matches.
   """
@@ -307,7 +307,7 @@ def display_matches(im1, im2, points1, points2, inliers):
     inliners_y = [points1[inliers][:, 1], points2[inliers][:, 1]]
     outliners_y = [points1[outliners][:, 1], points2[outliners][:, 1]]
 
-    plt.plot(outliners_x, outliners_y,color='blue', marker='o', markerfacecolor='red',
+    plt.plot(outliners_x, outliners_y, color='blue', marker='o', markerfacecolor='red',
              markersize=3, lw=.5)
     plt.plot(inliners_x, inliners_y, color='yellow', marker='o', markerfacecolor='red',
              markersize=3, lw=.5)
@@ -328,11 +328,11 @@ def pad_images(im1, im2):
     return np.hstack((pad_im1, pad_im2))
 
 
-def accumulate_homographies(H_succesive, m):
+def accumulate_homographies(h_succesive, m):
     """
   Convert a list of succesive homographies to a
   list of homographies to a common reference frame.
-  :param H_succesive: A list of M-1 3x3 homography
+  :param h_succesive: A list of M-1 3x3 homography
     matrices where H_successive[i] is a homography which transforms points
     from coordinate system i to coordinate system i+1.
   :param m: Index of the coordinate system towards which we would like to
@@ -340,14 +340,14 @@ def accumulate_homographies(H_succesive, m):
   :return: A list of M 3x3 homography matrices,
     where H2m[i] transforms points from coordinate system i to coordinate system m
   """
-    h_succesive_len = len(H_succesive)
+    h_succesive_len = len(h_succesive)
     h_m_list = [np.eye(3)]
-    for cur_homograph in H_succesive[m:]:
-        temp_homo = np.dot(h_m_list[-1] , np.linalg.inv(cur_homograph))
-        h_m_list.append(temp_homo/temp_homo[2,2])
-    for cur_homograph in H_succesive[::-1][h_succesive_len - m:]:
+    for cur_homograph in h_succesive[m:]:
+        temp_homo = np.dot(h_m_list[-1], np.linalg.inv(cur_homograph))
+        h_m_list.append(temp_homo / temp_homo[2, 2])
+    for cur_homograph in h_succesive[::-1][h_succesive_len - m:]:
         temp_homo = np.dot(h_m_list[0], cur_homograph)
-        h_m_list.insert(0, temp_homo/temp_homo[2,2])
+        h_m_list.insert(0, temp_homo / temp_homo[2, 2])
     return h_m_list
 
 
@@ -382,9 +382,8 @@ def warp_channel(image, homography):
     coords = np.dstack(np.meshgrid((np.arange(top_left[0], bot_right[0] + 1)),
                                    np.arange(top_left[1], bot_right[1] + 1))).reshape(-1, 2)
     warped_coords = apply_homography(coords, np.linalg.inv(homography))
-    return scipy.ndimage.map_coordinates(image, np.array([warped_coords[:,1], warped_coords[:,0]]), order=1,
+    return scipy.ndimage.map_coordinates(image, np.array([warped_coords[:, 1], warped_coords[:, 0]]), order=1,
                                          prefilter=False).reshape(width_change, height_change)
-
 
 
 def warp_image(image, homography):
@@ -646,9 +645,6 @@ class PanoramicVideoGenerator:
                   (out_folder, self.file_prefix))
 
 
-
-
-
 """
 
 
@@ -669,6 +665,7 @@ class PanoramicVideoGenerator:
 
 
 """
+
 
 def main():
     is_bonus = False
@@ -680,11 +677,10 @@ def main():
         os.system(('mkdir ' + str(os.path.join('dump', '%s'))) % exp_no_ext)
         os.system(
             ('ffmpeg -i ' + str(os.path.join('videos', '%s ')) + str(os.path.join('dump', '%s', '%s%%03d.jpg'))) % (
-            experiment, exp_no_ext, exp_no_ext))
+                experiment, exp_no_ext, exp_no_ext))
 
         s = time.time()
-        panorama_generator = PanoramicVideoGenerator(os.path.join('dump', '%s') % exp_no_ext, exp_no_ext, 2100,
-                                                          bonus=is_bonus)
+        panorama_generator = PanoramicVideoGenerator(os.path.join('dump', '%s') % exp_no_ext, exp_no_ext, 2100)
         panorama_generator.align_images(translation_only='boat' in experiment)
         panorama_generator.generate_panoramic_images(9)
         print(' time for %s: %.1f' % (exp_no_ext, time.time() - s))
@@ -693,4 +689,4 @@ def main():
 
 
 if __name__ == '__main__':
-  main()
+    main()
