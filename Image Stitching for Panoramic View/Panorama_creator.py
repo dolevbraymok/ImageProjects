@@ -668,7 +668,6 @@ class PanoramicVideoGenerator:
 
 
 def main():
-    is_bonus = False
     experiments = ['iguazu.mp4', 'boat.mp4']
 
     for experiment in experiments:
