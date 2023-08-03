@@ -1,4 +1,7 @@
-
+from scipy import ndimage
+from scipy.signal import convolve2d
+from skimage.color import rgb2gray
+import imageio as io
 import time
 import numpy as np
 import os
@@ -20,7 +23,99 @@ K_HARRIS_CONST = 0.04
 DESC_RADIUS = 3
 SPREAD_CORNERS_PARAM = 7
 
+GRAYSCALE = 1
+RGB = 2
+BIN_SIZE = 256
+CONV_GAUSS_CREATOR = [1, 1]
+MINIMUM_RESOLUTION = 16
 
+def gaussian_kernel(kernel_size):
+    conv_kernel = np.array([1, 1], dtype=np.float64)[:, None]
+    conv_kernel = convolve2d(conv_kernel, conv_kernel.T)
+    kernel = np.array([1], dtype=np.float64)[:, None]
+    for i in range(kernel_size - 1):
+        kernel = convolve2d(kernel, conv_kernel, 'full')
+    return kernel / kernel.sum()
+
+
+def blur_spatial(img, kernel_size):
+    kernel = gaussian_kernel(kernel_size)
+    blur_img = np.zeros_like(img)
+    if len(img.shape) == 2:
+        blur_img = convolve2d(img, kernel, 'same', 'symm')
+    else:
+        for i in range(3):
+            blur_img[..., i] = convolve2d(img[..., i], kernel, 'same', 'symm')
+    return blur_img
+
+
+
+def read_image(filename, representation):
+    """
+    Reads an image and converts it into a given representation
+    :param filename: filename of image on disk
+    :param representation: 1 for greyscale and 2 for RGB
+    :return: Returns the image as a np.float64 matrix normalized to [0,1]
+    """
+    if representation != GRAYSCALE and representation != RGB:
+        raise "representation value is Unknown"
+    try:
+        img = io.imread(filename)
+    except FileNotFoundError:
+        raise 'File does not exist'
+    if representation == GRAYSCALE and len(img.shape) == 3 and img.shape[2] == 3:
+        return rgb2gray(img)
+    else:
+        return img / (BIN_SIZE - 1)
+def reduce(im, blur_filter):
+    """
+    Reduces an image by a factor of 2 using the blur filter
+    :param im: Original image
+    :param blur_filter: Blur filter
+    :return: the downsampled image
+    """
+    blurred_image = ndimage.filters.convolve(
+        ndimage.filters.convolve(im, blur_filter, mode='constant', cval=0.0),
+        blur_filter.T, mode='constant', cval=0.0)
+    return blurred_image[::2, ::2]
+
+
+def build_gaussian_filter(filter_size):
+    """
+    Helper function that get filter_size and returns a gaussisan filter of that size
+    :param filter_size: the wanted size for the gaussian filter
+    :return: the gaussian filter as a np array with shape of (1,filter_size)
+    """
+    new_filter = CONV_GAUSS_CREATOR
+    for i in range(filter_size - 2):
+        new_filter = np.convolve(new_filter, CONV_GAUSS_CREATOR)
+    return (new_filter / np.sum(new_filter)).reshape(1, filter_size)
+
+
+def build_gaussian_pyramid(im, max_levels, filter_size):
+    """
+    Builds a gaussian pyramid for a given image
+    :param im: a grayscale image with double values in [0, 1]
+    :param max_levels: the maximal number of levels in the resulting pyramid.
+    :param filter_size: the size of the Gaussian filter
+            (an odd scalar that represents a squared filter)
+            to be used in constructing the pyramid filter
+    :return: pyr, filter_vec. Where pyr is the resulting pyramid as a
+            standard python array with maximum length of max_levels,
+            where each element of the array is a grayscale image.
+            and filter_vec is a row vector of shape (1, filter_size)
+            used for the pyramid construction.
+    """
+    pyr = list()
+    pyr.append(im)
+    blur_filter = build_gaussian_filter(filter_size)
+    tmp_image = im
+    for i in range(max_levels - 1):
+        tmp_image = reduce(tmp_image, blur_filter)
+        pyr.append(tmp_image)
+        if tmp_image.shape[0] <= MINIMUM_RESOLUTION or tmp_image.shape[1] <= MINIMUM_RESOLUTION:
+            break
+    return pyr, blur_filter
 def harris_corner_detector(im):
     """
   Detects harris corners.
@@ -31,9 +126,9 @@ def harris_corner_detector(im):
     conv = DERIV_FILTER.astype(im.dtype).reshape(3, 1)
     I_x = convolve(im, conv)
     I_y = convolve(im, conv.T)
-    I_x_pow = sol4_utils.blur_spatial(np.power(I_x, 2), 3)
-    I_y_pow = sol4_utils.blur_spatial(np.power(I_y, 2), 3)
-    I_x_y = sol4_utils.blur_spatial(I_x * I_y, 3)
+    I_x_pow = blur_spatial(np.power(I_x, 2), 3)
+    I_y_pow = blur_spatial(np.power(I_y, 2), 3)
+    I_x_y = blur_spatial(I_x * I_y, 3)
 
     tmp_matrix = np.dstack((I_x_pow, I_x_y, I_x_y, I_y_pow)).reshape((-1, 2, 2))
     det = np.linalg.det(tmp_matrix)
@@ -426,9 +521,9 @@ class PanoramicVideoGenerator:
         # Extract feature point locations and descriptors.
         points_and_descriptors = []
         for file in self.files:
-            image = sol4_utils.read_image(file, 1)
+            image = read_image(file, 1)
             self.h, self.w = image.shape
-            pyramid, _ = sol4_utils.build_gaussian_pyramid(image, 3, 7)
+            pyramid, _ = build_gaussian_pyramid(image, 3, 7)
             points_and_descriptors.append(find_features(pyramid))
 
         # Compute homographies between successive pairs of images.
@@ -506,7 +601,7 @@ class PanoramicVideoGenerator:
         self.panoramas = np.zeros((number_of_panoramas, panorama_size[1], panorama_size[0], 3), dtype=np.float64)
         for i, frame_index in enumerate(self.frames_for_panoramas):
             # warp every input image once, and populate all panoramas
-            image = sol4_utils.read_image(self.files[frame_index], 2)
+            image = read_image(self.files[frame_index], 2)
             warped_image = warp_image(image, self.homographies[i])
             x_offset, y_offset = self.bounding_boxes[i][0].astype(np.int)
             y_bottom = y_offset + warped_image.shape[0]
@@ -577,19 +672,24 @@ class PanoramicVideoGenerator:
 
 def main():
     is_bonus = False
-    experiment = 'ENTER FILE ADDRESS HERE'
-    exp_no_ext = experiment.split('.')[0]
-    os.system('mkdir dump')
-    os.system(('mkdir ' + str(os.path.join('dump', '%s'))) % exp_no_ext)
-    os.system(('ffmpeg -i ' + str(os.path.join('videos', '%s ')) + str(os.path.join('dump', '%s', '%s%%03d.jpg'))) % (experiment, exp_no_ext, exp_no_ext))
+    experiments = ['iguazu.mp4', 'boat.mp4']
 
+    for experiment in experiments:
+        exp_no_ext = experiment.split('.')[0]
+        os.system('mkdir dump')
+        os.system(('mkdir ' + str(os.path.join('dump', '%s'))) % exp_no_ext)
+        os.system(
+            ('ffmpeg -i ' + str(os.path.join('videos', '%s ')) + str(os.path.join('dump', '%s', '%s%%03d.jpg'))) % (
+            experiment, exp_no_ext, exp_no_ext))
 
-    s = time.time()
-    panorama_generator = PanoramicVideoGenerator(os.path.join('dump', '%s') % exp_no_ext, exp_no_ext, 2100,bonus=is_bonus)
-    panorama_generator.align_images(translation_only=True)
-    panorama_generator.generate_panoramic_images(9)
-    print(' time for %s: %.1f' % (exp_no_ext, time.time() - s))
-    panorama_generator.save_panoramas_to_video()
+        s = time.time()
+        panorama_generator = PanoramicVideoGenerator(os.path.join('dump', '%s') % exp_no_ext, exp_no_ext, 2100,
+                                                          bonus=is_bonus)
+        panorama_generator.align_images(translation_only='boat' in experiment)
+        panorama_generator.generate_panoramic_images(9)
+        print(' time for %s: %.1f' % (exp_no_ext, time.time() - s))
+
+        panorama_generator.save_panoramas_to_video()
 
 
 if __name__ == '__main__':
