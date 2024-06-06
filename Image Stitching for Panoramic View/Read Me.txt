@@ -1,2 +1,8 @@
 This project is a Python script that converts videos into panoramic images.
 It processes each frame of the video, stitches them together using panorama stitching algorithms, and produces a panoramic view of the scene captured in the video.
+
+Implementation Method:
+The Video is proccessed frame by frame
+I used Harris Corner Detection and Gaussian Pyramids to find features
+and the used RANSAC to find a homography the fit largest number if features
+Lastly warp and stiches images together using the homography found before
